@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, redirect, jsonify, url_for
 from flask_sqlalchemy import SQLAlchemy
 import string, random, re
 from typing import Optional
@@ -68,7 +68,9 @@ def generate_random_password(length: int = 12) -> str:
 @app.route("/creds", methods=["GET"])
 def get_passwords():
     """Endpoint to retrieve all passwords (for testing purposes)."""
+
     creds = Credential.query.all()
+
     return jsonify(
         {
             "creds": [cred.password for cred in creds]
@@ -85,6 +87,22 @@ def delete_password(id: int):
     db.session.delete(cred)
     db.session.commit()
     return jsonify({"message": "Credential deleted successfully"})
+
+@app.route("/auth", methods=["POST"])
+def authenticate():
+    """Endpoint to authenticate a user (dummy implementation)."""
+    data = request.get_json(silent=True)
+    if not data or "username" not in data or "password" not in data:
+        return jsonify({"detail": "Username and password required"}), 400
+
+    # Dummy authentication logic
+    if data["username"] == "admin" and data["password"] == "password":
+        return redirect(url_for("get_passwords"))
+    return jsonify({"detail": "Invalid credentials"}), 401
+
+def get_password_by_id(id: int) -> Optional[Credential]:
+    """Retrieve a password by its ID."""
+    return Credential.query.get(id)
 
 if __name__ == "__main__":
     with app.app_context():
