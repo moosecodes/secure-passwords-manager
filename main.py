@@ -8,35 +8,26 @@ creds = []
 @app.route("/creds", methods=["GET"])
 def add_password():
     """Endpoint to add a password for testing purposes"""
-    password = request.form.get("password", "")
+    password = ""
+    if request.is_json:
+        data = request.get_json(silent=True)
+        if data and "password" in data:
+            password = data["password"]
+    else:
+        password = request.form.get("password", "")
 
-    if not password or len(password.strip()) == 0 or password.isspace():
-        print("Password is empty or whitespace, generating random password.")
+    if not password or len(password.strip()) == 0:
         password = generate_random_password()
 
-    if len(password.strip()) < 8 or len(password.strip()) > 32:
-        print("Password length is invalid:", len(password.strip()))
-        return (
-            jsonify({"detail": "Password must be between 8 and 32 characters long"}),
-            400,
-        )
-
-    if not re.match(r'^[a-zA-Z0-9!@#$%^&*()_+={}\[\]:;"\'<>,.?/\\|-~`]+$', password):
-        return (
-            jsonify(
-                {
-                    "detail": "Password can only contain alphanumeric characters and special characters"
-                }
-            ),
-            400,
-        )
+    is_valid, error = validate_password(password)
+    if not is_valid:
+        return jsonify({"detail": error}), 400
 
     if password in creds:
         return jsonify({"detail": "Password already exists"}), 400
-    else:
-        creds.append(password)
 
-    logging.info("Passwords: %s", creds)
+    creds.append(password)
+    # logging.info("Passwords: %s", creds)  # Avoid logging passwords
 
     return jsonify(
         {
@@ -45,6 +36,13 @@ def add_password():
         }
     )
 
+def validate_password(password: str):
+    """Validate the password against specific criteria."""
+    if len(password) < 8 or len(password) > 32:
+        return False, "Password must be between 8 and 32 characters long"
+    if not re.match(r'^[a-zA-Z0-9!@#$%^&*()_+={}\[\]:;"\'<>,.?/\\|-~`]+$', password):
+        return False, "Password can only contain alphanumeric characters and special characters"
+    return True, None
 
 def generate_random_password(length: int = 12) -> str:
     """Generate a random password with letters, digits, and punctuation."""
@@ -52,7 +50,12 @@ def generate_random_password(length: int = 12) -> str:
         raise ValueError("Password length must be between 8 and 32 characters.")
 
     characters = string.ascii_letters + string.digits + string.punctuation
-    return "".join(random.choice(characters) for _ in range(length))
+    password = "".join(random.choice(characters) for _ in range(length))
+
+    is_valid, error = validate_password(password)
+    if not is_valid:
+        raise ValueError(f"Generated password is invalid: {error}")
+    return password
 
 
 if __name__ == "__main__":
